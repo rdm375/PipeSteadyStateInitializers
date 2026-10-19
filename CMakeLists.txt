@@ -5,7 +5,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(pipe_initializers src/steady_initializers.cpp)
+add_library(pipe_initializers
+    src/steady_initializers.cpp
+    src/adiabatic_initializers.cpp)
 target_include_directories(pipe_initializers PUBLIC include)
 target_compile_options(pipe_initializers PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
@@ -16,6 +18,14 @@ target_compile_options(pipe_init_profile_export PRIVATE -Wall -Wextra -Wpedantic
 add_executable(pipe_init_demo src/main.cpp)
 target_link_libraries(pipe_init_demo PRIVATE pipe_initializers)
 target_compile_options(pipe_init_demo PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(adiabatic_pipe_init_demo src/adiabatic_demo.cpp)
+target_link_libraries(adiabatic_pipe_init_demo PRIVATE pipe_initializers)
+target_compile_options(adiabatic_pipe_init_demo PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(adiabatic_pipe_init_profile_export examples/export_adiabatic_profiles.cpp)
+target_link_libraries(adiabatic_pipe_init_profile_export PRIVATE pipe_initializers)
+target_compile_options(adiabatic_pipe_init_profile_export PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 add_executable(pipe_init_benchmark examples/benchmark_initializers.cpp)
 target_link_libraries(pipe_init_benchmark PRIVATE pipe_initializers)

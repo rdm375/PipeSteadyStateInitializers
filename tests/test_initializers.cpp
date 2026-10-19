@@ -1,4 +1,5 @@
 #include "pipe/steady_initializers.hpp"
+#include "pipe/adiabatic_initializers.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -170,6 +171,55 @@ void trapezoidal_relaxation_matches_newton_steady_state()
     }
 }
 
+void adiabatic_marching_and_newton_agree()
+{
+    using namespace pipe_init::adiabatic;
+    Configuration c;
+    c.cells = 8;
+    c.length = 2'000.0;
+    c.inlet_pressure = 6.0e6;
+    c.inlet_temperature = 300.0;
+    c.outlet_mass_flow = 35.0;
+    c.hill_height = 40.0;
+    const State marched = steady_spatial_marching(c);
+    const SolveInfo solved = coupled_steady_newton(c, marched, 1.0e-12);
+    require(scaled_steady_residual(c, marched) < 2.0e-12,
+            "adiabatic marching should satisfy the discrete steady residual");
+    require(solved.scaled_residual < 2.0e-12,
+            "adiabatic coupled Newton did not converge tightly");
+    for (std::size_t i = 0; i <= c.cells; ++i) {
+        require(std::abs(marched.pressure[i] - solved.state.pressure[i]) /
+                    c.inlet_pressure < 2.0e-11,
+                "adiabatic marching and Newton pressure profiles disagree");
+        require(std::abs(marched.temperature[i] - solved.state.temperature[i]) /
+                    c.inlet_temperature < 2.0e-11,
+                "adiabatic marching and Newton temperature profiles disagree");
+    }
+}
+
+void adiabatic_theta_relaxation_converges()
+{
+    using namespace pipe_init::adiabatic;
+    Configuration c;
+    c.cells = 6;
+    c.length = 1'000.0;
+    c.inlet_pressure = 6.0e6;
+    c.inlet_temperature = 300.0;
+    c.outlet_mass_flow = 25.0;
+    c.hill_height = 10.0;
+    RelaxationOptions options;
+    options.theta = 1.0;
+    options.pseudo_courant = 5.0;
+    options.tolerance = 2.0e-7;
+    options.max_pseudo_time = 1.0e6;
+    options.max_steps = 200'000;
+    const auto relaxed = implicit_theta_relaxation(c, options);
+    require(relaxed.scaled_residual <= options.tolerance,
+            "adiabatic theta relaxation did not meet its residual tolerance");
+    require(scaled_steady_residual(c, relaxed.state) < 5.0e-7,
+            "adiabatic theta-relaxed state fails the steady residual check");
+}
+
 } // namespace
 
 int main()
@@ -181,6 +231,8 @@ int main()
         discrete_marching_matches_newton_and_has_small_residual();
         relaxation_matches_newton_steady_state();
         trapezoidal_relaxation_matches_newton_steady_state();
+        adiabatic_marching_and_newton_agree();
+        adiabatic_theta_relaxation_converges();
         std::cout << "PASS: all isothermal steady-initializer checks\n";
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';

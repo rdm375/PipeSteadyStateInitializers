@@ -73,6 +73,32 @@ median.
 
 Discrete marching and steady Newton are equivalent for the current boundary conditions and constant friction factor closure; Newton remains useful as a general nonlinear-system reference. Theta relaxation should converge to the same equilibrium within its stopping tolerance. The analytical method provides a fast continuum approximation and an independent flat-pipe/hydrostatic reference.
 
+## Adiabatic ideal-gas initializer experiment
+
+The separate `pipe_init::adiabatic` module implements three initializer strategies for a calorically perfect ideal gas. It uses constant area, constant viscosity, Swamee–Jain Darcy friction, elevation, forward flow, prescribed inlet pressure and temperature, and prescribed outlet mass flow. The gas has constant $R_s$ and $\gamma$; there is no wall heat transfer, soil state, or real-gas EOS.
+
+The steady cell momentum residual includes pressure, convective momentum flux, gravity, and Darcy drag. The steady energy balance conserves $h+u^2/2+gz$ between nodes. Spatial marching solves the local momentum and total-enthalpy equations cell by cell. Coupled Newton solves all continuity, momentum, and energy residuals together.
+
+The adiabatic theta method advances the semidiscrete mass, momentum, and total-energy equations in pseudo-time under the steady boundary conditions. Pseudo-time is used only to reach the equilibrium; it is not presented as a physical transient run. The default demo uses $\theta=0.9$ for added damping of the pseudo-time iterations.
+
+Build and run the adiabatic comparison:
+
+```sh
+cmake --build build --target adiabatic_pipe_init_demo -j
+./build/adiabatic_pipe_init_demo
+```
+
+Export and plot all three adiabatic initializer profiles, with pressure, mass
+flow, and temperature in the first three panels and pipe elevation in the
+bottom panel:
+
+```bash
+cmake --build build --target adiabatic_pipe_init_profile_export -j
+./build/adiabatic_pipe_init_profile_export > adiabatic_profiles.csv
+python3 scripts/plot_adiabatic_profiles.py adiabatic_profiles.csv \\
+    -o adiabatic_initializer_profiles.png
+```
+
 ## Current scope
 
 The implementation uses a constant-$Z$, constant-viscosity isothermal closure and Swamee–Jain friction. It implements forward flow for the demonstration configuration. The friction term itself is signed for reversed flow, but reversed-flow boundary handling is not yet generalized. The grid positions, endpoint half-cell storage, and boundary convention are aligned to the simulator notes. The momentum closure remains the reduced low-Mach form documented above; the original simulator's momentum flux, EOS, friction routine, and software interfaces still need direct comparison in its source checkout before claiming full physics or code-level equivalence.

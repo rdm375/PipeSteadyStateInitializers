@@ -1,5 +1,6 @@
 #include "pipe/steady_initializers.hpp"
 #include "pipe/adiabatic_initializers.hpp"
+#include "pipe/thermal_wall_initializers.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -220,6 +221,44 @@ void adiabatic_theta_relaxation_converges()
             "adiabatic theta-relaxed state fails the steady residual check");
 }
 
+void thermal_wall_marching_newton_and_theta_agree()
+{
+    using namespace pipe_init::thermal_wall;
+    Configuration c;
+    c.cells = 5;
+    c.length = 5'000.0;
+    c.hill_height = 20.0;
+    const State marched = steady_spatial_marching(c);
+    require(scaled_steady_residual(c, marched) < 2.0e-12,
+            "thermal-wall marching should satisfy discrete steady residual");
+    const SolveInfo solved = coupled_steady_newton(c, analytical_approximation(c));
+    require(solved.scaled_residual < 2.0e-10,
+            "thermal-wall Newton did not converge");
+    for (std::size_t i = 0; i <= c.cells; ++i) {
+        require(std::abs(marched.pressure[i] - solved.state.pressure[i]) /
+                    c.inlet_pressure < 2.0e-10,
+                "thermal-wall pressure profiles disagree");
+        require(std::abs(marched.gas_temperature[i] -
+                         solved.state.gas_temperature[i]) / c.inlet_temperature < 2.0e-10,
+                "thermal-wall gas temperatures disagree");
+        require(std::abs(marched.wall_temperature[i] -
+                         solved.state.wall_temperature[i]) / c.inlet_temperature < 2.0e-10,
+                "thermal-wall temperatures disagree");
+    }
+    RelaxationOptions options;
+    options.theta = 1.0;
+    options.pseudo_courant = 10.0;
+    options.tolerance = 2.0e-7;
+    options.max_pseudo_time = 1.0e6;
+    const auto relaxed = implicit_theta_relaxation(c, options);
+    require(relaxed.scaled_residual <= options.tolerance,
+            "thermal-wall theta relaxation missed residual tolerance");
+    for (std::size_t i = 0; i <= c.cells; ++i)
+        require(std::abs(relaxed.state.gas_temperature[i] -
+                         marched.gas_temperature[i]) / c.inlet_temperature < 2.0e-5,
+                "thermal-wall theta/marching temperatures disagree");
+}
+
 } // namespace
 
 int main()
@@ -233,7 +272,8 @@ int main()
         trapezoidal_relaxation_matches_newton_steady_state();
         adiabatic_marching_and_newton_agree();
         adiabatic_theta_relaxation_converges();
-        std::cout << "PASS: all isothermal steady-initializer checks\n";
+        thermal_wall_marching_newton_and_theta_agree();
+        std::cout << "PASS: all steady-initializer checks\n";
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';
         return EXIT_FAILURE;

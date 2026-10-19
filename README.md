@@ -99,6 +99,28 @@ python3 scripts/plot_adiabatic_profiles.py adiabatic_profiles.csv \\
     -o adiabatic_initializer_profiles.png
 ```
 
+## Thermal gas and lumped-wall initializers
+
+The thermal_wall module adds gas pressure, gas temperature, wall temperature,
+and staggered mass flow. The wall is locally lumped through its thickness,
+with no axial conduction. Soil temperature is prescribed. The demonstration
+uses an ideal gas, constant heat capacities, Swamee–Jain friction, and the
+simulator-aligned nodal/staggered layout. At steady state the wall balance is
+algebraic, so wall temperature is recovered locally; wall heat capacity
+remains active in pseudo-time relaxation.
+
+The analytical approximation uses an exponential gas-temperature profile
+and a continuous pressure integral. Spatial marching solves the discrete
+temperature/wall balance and local momentum equation. Coupled Newton solves
+the complete discrete steady residual; implicit theta relaxation advances
+the semidiscrete gas/wall transient to equilibrium.
+
+    cmake --build build --target thermal_wall_init_demo thermal_wall_profile_export -j
+    ./build/thermal_wall_init_demo
+    ./build/thermal_wall_profile_export > thermal_wall_profiles.csv
+    python3 scripts/plot_thermal_wall_profiles.py thermal_wall_profiles.csv \
+        -o thermal_wall_initializer_profiles.png
+
 ## Current scope
 
 The implementation uses a constant-$Z$, constant-viscosity isothermal closure and Swamee–Jain friction. It implements forward flow for the demonstration configuration. The friction term itself is signed for reversed flow, but reversed-flow boundary handling is not yet generalized. The grid positions, endpoint half-cell storage, and boundary convention are aligned to the simulator notes. The momentum closure remains the reduced low-Mach form documented above; the original simulator's momentum flux, EOS, friction routine, and software interfaces still need direct comparison in its source checkout before claiming full physics or code-level equivalence.

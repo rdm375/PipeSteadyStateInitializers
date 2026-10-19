@@ -13,7 +13,7 @@ void print_summary(const char* label, const pipe_init::Configuration& c,
 {
     std::cout << std::left << std::setw(25) << label
               << " p_out=" << std::fixed << std::setprecision(3)
-              << state.outlet_pressure/1.0e6 << " MPa"
+              << state.pressure.back()/1.0e6 << " MPa"
               << " max|m-mdot_out|=";
     double flow_error = 0.0;
     for (double value : state.flow) {
@@ -30,18 +30,16 @@ int main()
 {
     try {
         pipe_init::Configuration configuration;
-        configuration.cells = 32;
-        configuration.length = 20'000.0;
-        configuration.inlet_pressure = 5.0e6;
-        configuration.outlet_mass_flow = 50.0;
-        configuration.hill_height = 150.0;
 
         const auto analytical =
             pipe_init::analytical_pressure_squared(configuration);
+        const auto marching =
+            pipe_init::discrete_steady_marching(configuration);
         const auto newton = pipe_init::newton_steady_state(
-            configuration, analytical);
+            configuration, marching);
+        const pipe_init::RelaxationOptions relaxation_options;
         const auto relaxation = pipe_init::relax_to_steady_state(
-            configuration);
+            configuration, relaxation_options);
 
         std::cout << "Isothermal pipeline steady initializers\n"
                   << "cells=" << configuration.cells
@@ -51,13 +49,18 @@ int main()
         print_summary("analytical pressure-squared", configuration,
                       analytical,
                       pipe_init::scaled_steady_residual(configuration, analytical));
+        print_summary("discrete steady marching", configuration, marching,
+                      pipe_init::scaled_steady_residual(configuration, marching));
         print_summary("Newton, d/dt = 0", configuration, newton.state,
                       newton.scaled_residual);
         print_summary("pseudo-time relaxation", configuration, relaxation.state,
                       pipe_init::scaled_steady_residual(configuration,
                                                         relaxation.state));
         std::cout << "Newton iterations=" << newton.iterations
+                  << ", relaxation theta=" << std::defaultfloat
+                  << relaxation_options.theta
                   << ", relaxation steps=" << relaxation.steps
+                  << ", relaxation dt=" << relaxation.dt << " s"
                   << ", pseudo-time=" << relaxation.pseudo_time << " s\n";
     } catch (const std::exception& error) {
         std::cerr << "pipe_init_demo: " << error.what() << '\n';

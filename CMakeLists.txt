@@ -9,9 +9,17 @@ add_library(pipe_initializers src/steady_initializers.cpp)
 target_include_directories(pipe_initializers PUBLIC include)
 target_compile_options(pipe_initializers PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
+add_executable(pipe_init_profile_export examples/export_initializer_profiles.cpp)
+target_link_libraries(pipe_init_profile_export PRIVATE pipe_initializers)
+target_compile_options(pipe_init_profile_export PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
 add_executable(pipe_init_demo src/main.cpp)
 target_link_libraries(pipe_init_demo PRIVATE pipe_initializers)
 target_compile_options(pipe_init_demo PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(pipe_init_benchmark examples/benchmark_initializers.cpp)
+target_link_libraries(pipe_init_benchmark PRIVATE pipe_initializers)
+target_compile_options(pipe_init_benchmark PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 enable_testing()
 add_executable(pipe_init_tests tests/test_initializers.cpp)

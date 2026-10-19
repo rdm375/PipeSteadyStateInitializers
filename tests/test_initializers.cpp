@@ -31,6 +31,12 @@ void analytical_flat_pipe_matches_pressure_squared_relation()
     auto c = small_case();
     c.hill_height = 0.0;
     const auto state = pipe_init::analytical_pressure_squared(c);
+    require(state.pressure.size() == c.cells + 1,
+            "pressure state must contain N+1 simulator nodes");
+    require(state.flow.size() == c.cells,
+            "flow state must contain N internal staggered faces");
+    require(state.pressure.front() == c.inlet_pressure,
+            "inlet pressure node must equal the prescribed boundary value");
     const double friction = pipe_init::swamee_jain_friction_factor(
         c, c.outlet_mass_flow);
     const double coefficient = friction*c.gas_constant_product()
@@ -41,7 +47,7 @@ void analytical_flat_pipe_matches_pressure_squared_relation()
     require(expected_outlet_squared > 0.0,
             "test case must have positive outlet pressure squared");
     const double expected_outlet = std::sqrt(expected_outlet_squared);
-    require(std::abs(state.outlet_pressure - expected_outlet)/expected_outlet
+    require(std::abs(state.pressure.back() - expected_outlet)/expected_outlet
                 < 2.0e-12,
             "flat-pipe analytical pressure-squared relation mismatch");
     require(pipe_init::scaled_steady_residual(c, state) < 1.0e-3,
@@ -54,14 +60,13 @@ void analytical_hydrostatic_limit()
     c.outlet_mass_flow = 0.0;
     const auto state = pipe_init::analytical_pressure_squared(c);
     const auto elevation = c.elevation_faces();
-    for (std::size_t i = 0; i < c.cells; ++i) {
-        const double h_center = 0.5*(elevation[i] + elevation[i + 1]);
+    for (std::size_t i = 0; i <= c.cells; ++i) {
         const double expected = c.inlet_pressure*std::exp(
-            -c.gravity*h_center/c.gas_constant_product());
+            -c.gravity*elevation[i]/c.gas_constant_product());
         require(std::abs(state.pressure[i] - expected)/expected < 2.0e-12,
                 "zero-flow analytical profile should recover isothermal hydrostatics");
     }
-    require(std::abs(state.outlet_pressure - c.inlet_pressure)/c.inlet_pressure
+    require(std::abs(state.pressure.back() - c.inlet_pressure)/c.inlet_pressure
                 < 2.0e-12,
             "equal endpoint elevations should recover equal endpoint pressures at zero flow");
 }
@@ -70,13 +75,19 @@ void newton_solves_discrete_steady_residual()
 {
     const auto c = small_case();
     auto guess = pipe_init::analytical_pressure_squared(c);
-    for (std::size_t i = 0; i < c.cells; ++i) {
-        const double fraction = static_cast<double>(i + 1)/
+    for (std::size_t i = 1; i <= c.cells; ++i) {
+        const double fraction = static_cast<double>(i)/
                                 static_cast<double>(c.cells);
         guess.pressure[i] *= 1.0 - 0.015*fraction;
-        guess.flow[i] *= 1.0 + 0.04*fraction;
+        if (i < c.cells) {
+            guess.flow[i] *= 1.0 + 0.04*fraction;
+        }
     }
     const auto solved = pipe_init::newton_steady_state(c, guess);
+    require(solved.state.pressure.size() == c.cells + 1,
+            "Newton state must retain N+1 pressure nodes");
+    require(solved.state.pressure.front() == c.inlet_pressure,
+            "Newton must keep the inlet pressure fixed");
     require(solved.scaled_residual < 1.0e-10,
             "Newton steady residual did not converge tightly");
     require(pipe_init::scaled_steady_residual(c, solved.state) < 1.0e-10,
@@ -87,12 +98,37 @@ void newton_solves_discrete_steady_residual()
     }
 }
 
+void discrete_marching_matches_newton_and_has_small_residual()
+{
+    const auto c = small_case();
+    const auto marched = pipe_init::discrete_steady_marching(c);
+    const auto solved = pipe_init::newton_steady_state(
+        c, pipe_init::analytical_pressure_squared(c), 1.0e-13);
+    require(pipe_init::scaled_steady_residual(c, marched) < 2.0e-15,
+            "discrete marching should satisfy each discrete steady balance");
+    for (std::size_t i = 0; i <= c.cells; ++i) {
+        require(std::abs(marched.pressure[i] - solved.state.pressure[i])
+                    / c.inlet_pressure < 2.0e-12,
+                "discrete marching and Newton pressure profiles disagree");
+    }
+    for (const double flow : marched.flow) {
+        require(flow == c.outlet_mass_flow,
+                "discrete marching should initialize constant steady flow");
+    }
+
+    const auto analytic = pipe_init::analytical_pressure_squared(c);
+    require(pipe_init::scaled_steady_residual(c, analytic) >
+                pipe_init::scaled_steady_residual(c, marched),
+            "continuum analytical profile should retain a discretization residual");
+}
+
 void relaxation_matches_newton_steady_state()
 {
     const auto c = small_case();
     const auto newton = pipe_init::newton_steady_state(
         c, pipe_init::analytical_pressure_squared(c));
     pipe_init::RelaxationOptions options;
+    options.theta = 1.0;
     options.tolerance = 2.0e-8;
     options.max_pseudo_time = 200'000.0;
     options.max_steps = 500'000;
@@ -101,12 +137,36 @@ void relaxation_matches_newton_steady_state()
             "relaxation stopped before reaching its derivative tolerance");
     require(pipe_init::scaled_steady_residual(c, relaxed.state) < 1.0e-6,
             "relaxed state fails steady residual check");
-    for (std::size_t i = 0; i < c.cells; ++i) {
+    for (std::size_t i = 0; i <= c.cells; ++i) {
         const double relative = std::abs(relaxed.state.pressure[i]
                                          - newton.state.pressure[i])
                                 / c.inlet_pressure;
         require(relative < 2.0e-5,
                 "relaxation and Newton pressure profiles disagree");
+    }
+}
+
+void trapezoidal_relaxation_matches_newton_steady_state()
+{
+    const auto c = small_case();
+    const auto newton = pipe_init::newton_steady_state(
+        c, pipe_init::analytical_pressure_squared(c));
+    pipe_init::RelaxationOptions options;
+    options.theta = 0.5;
+    options.tolerance = 2.0e-8;
+    options.max_pseudo_time = 200'000.0;
+    options.max_steps = 500'000;
+    const auto relaxed = pipe_init::relax_to_steady_state(c, options);
+    require(relaxed.scaled_rhs <= options.tolerance,
+            "theta=0.5 relaxation stopped before reaching derivative tolerance");
+    require(pipe_init::scaled_steady_residual(c, relaxed.state) < 1.0e-6,
+            "theta=0.5 relaxed state fails steady residual check");
+    for (std::size_t i = 0; i <= c.cells; ++i) {
+        const double relative = std::abs(relaxed.state.pressure[i]
+                                         - newton.state.pressure[i])
+                                / c.inlet_pressure;
+        require(relative < 2.0e-5,
+                "theta=0.5 relaxation and Newton pressure profiles disagree");
     }
 }
 
@@ -118,7 +178,9 @@ int main()
         analytical_flat_pipe_matches_pressure_squared_relation();
         analytical_hydrostatic_limit();
         newton_solves_discrete_steady_residual();
+        discrete_marching_matches_newton_and_has_small_residual();
         relaxation_matches_newton_steady_state();
+        trapezoidal_relaxation_matches_newton_steady_state();
         std::cout << "PASS: all isothermal steady-initializer checks\n";
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';

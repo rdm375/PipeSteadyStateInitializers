@@ -6,7 +6,7 @@
 namespace pipe_init {
 
 struct Configuration {
-    std::size_t cells{40};
+    std::size_t cells{100};
     double length{100'000.0};
     double diameter{0.6};
     double roughness{4.5e-5};
@@ -17,7 +17,7 @@ struct Configuration {
     double inlet_pressure{8.0e6};
     double outlet_mass_flow{100.0};
     double gravity{9.80665};
-    double hill_height{250.0};
+    double hill_height{0.0};
 
     [[nodiscard]] double area() const;
     [[nodiscard]] double dx() const;
@@ -29,10 +29,10 @@ struct Configuration {
 };
 
 struct State {
-    // Pressure is cell-centered; flow is stored at the left face of each cell.
+    // Pressure is stored at N+1 nodes; flow at the N interior faces.
+    // pressure[i] is at x=i*dx; flow[i] is at x=(i+1/2)*dx.
     std::vector<double> pressure;
     std::vector<double> flow;
-    double outlet_pressure{};
 };
 
 struct SolveInfo {
@@ -46,7 +46,8 @@ struct RelaxationOptions {
     double max_pseudo_time{5.0e6};
     std::size_t max_steps{2'000'000};
     std::size_t consecutive_converged_steps{8};
-    double cfl{0.2};
+    double theta{0.5}; // theta in [0.5, 1]; 0.5 is trapezoidal.
+    double pseudo_courant{10.0}; // dt = pseudo_courant * dx / sqrt(Z R_s T).
 };
 
 struct RelaxationInfo {
@@ -55,6 +56,7 @@ struct RelaxationInfo {
     double pseudo_time{};
     double scaled_rhs{};
     double dt{};
+    std::size_t newton_iterations{};
 };
 
 [[nodiscard]] double swamee_jain_friction_factor(
@@ -62,6 +64,9 @@ struct RelaxationInfo {
     double mass_flow);
 
 [[nodiscard]] State analytical_pressure_squared(
+    const Configuration& configuration);
+
+[[nodiscard]] State discrete_steady_marching(
     const Configuration& configuration);
 
 [[nodiscard]] SolveInfo newton_steady_state(

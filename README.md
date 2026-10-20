@@ -125,4 +125,40 @@ the semidiscrete gas/wall transient to equilibrium.
 
 The implementation uses a constant-$Z$, constant-viscosity isothermal closure and Swamee–Jain friction. It implements forward flow for the demonstration configuration. The friction term itself is signed for reversed flow, but reversed-flow boundary handling is not yet generalized. The grid positions, endpoint half-cell storage, and boundary convention are aligned to the simulator notes. The momentum closure remains the reduced low-Mach form documented above; the original simulator's momentum flux, EOS, friction routine, and software interfaces still need direct comparison in its source checkout before claiming full physics or code-level equivalence.
 
+## Fully thermal gas, wall, and soil-shell initializers
+
+The `pipe_init::soil_shell` model extends the locally lumped pipe wall with
+concentric radial soil shells. Each axial node has one temperature per soil
+shell. Heat conducts radially between the wall and shells and through the
+outermost shell to a prescribed far-field temperature. Soil has heat capacity
+in pseudo-time; this reference model omits axial soil conduction. The gas uses
+the same low-Mach ideal-gas momentum and energy balances, elevation, and
+simulator-aligned staggered grid as the other thermal reference modules.
+
+The default configuration has four soil shells, with node radii 0.40, 0.58,
+0.84, and 1.20 m, and a prescribed far-field boundary at 2.0 m. The analytical
+approximation treats the complete radial resistance as an effective heat
+transfer coefficient and uses an exponential gas-temperature profile plus a
+continuous pressure integral. Spatial marching solves the discrete energy
+balance and local momentum equation, reconstructing wall and shell temperatures
+from the radial resistance network. Coupled Newton solves every gas, wall, and
+soil-shell steady balance simultaneously. Implicit theta relaxation advances
+the same semidiscrete gas/wall/soil equations in pseudo-time. It starts close
+to the analytical profile with a 5% perturbation in the soil-shell temperature
+departure from far-field, then checks the common steady residual.
+
+The demo reports one measured run time per initializer, scaled residual,
+Newton/relaxation work counts, and scaled differences against spatial marching.
+Its timing numbers are for comparison on the current run and are not statistical
+benchmarks. Export and make the four-method plot, with one pressure/flow/
+temperature panel per initializer and elevation below:
+
+```sh
+cmake --build build --target soil_shell_init_demo soil_shell_profile_export -j
+./build/soil_shell_init_demo
+./build/soil_shell_profile_export > soil_shell_profiles.csv
+python3 scripts/plot_soil_shell_profiles.py soil_shell_profiles.csv \
+    -o soil_shell_initializer_profiles.png
+```
+
 This is a reference implementation for the three initializer algorithms, not yet a patch to the original simulator. The pressure/flow locations and boundary storage follow the simulator notes available here. Before merging into that repository, compare the exact momentum residual, EOS, friction routine and derivatives, and solver interfaces against its source checkout.

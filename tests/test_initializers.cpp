@@ -1,6 +1,7 @@
 #include "pipe/steady_initializers.hpp"
 #include "pipe/adiabatic_initializers.hpp"
 #include "pipe/thermal_wall_initializers.hpp"
+#include "pipe/soil_shell_initializers.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -259,6 +260,40 @@ void thermal_wall_marching_newton_and_theta_agree()
                 "thermal-wall theta/marching temperatures disagree");
 }
 
+void soil_shell_marching_newton_and_theta_agree()
+{
+    using namespace pipe_init::soil_shell;
+    Configuration c;
+    const State marched=steady_spatial_marching(c);
+    require(scaled_steady_residual(c,marched)<2.0e-12,
+            "soil-shell marching should satisfy the discrete steady residual");
+    const SolveInfo solved=coupled_steady_newton(c,analytical_approximation(c),1.0e-11,35);
+    require(solved.scaled_residual<2.0e-10,"soil-shell coupled Newton did not converge");
+    for(std::size_t i=0;i<=c.cells;++i) {
+        require(std::abs(marched.pressure[i]-solved.state.pressure[i])/c.inlet_pressure<2.0e-9,
+                "soil-shell marching/Newton pressure profiles disagree");
+        require(std::abs(marched.gas_temperature[i]-solved.state.gas_temperature[i])/c.inlet_temperature<2.0e-9,
+                "soil-shell marching/Newton gas profiles disagree");
+        require(std::abs(marched.wall_temperature[i]-solved.state.wall_temperature[i])/c.inlet_temperature<2.0e-9,
+                "soil-shell marching/Newton wall profiles disagree");
+        for(std::size_t j=0;j<c.soil_shell_radii.size();++j)
+            require(std::abs(marched.soil_temperature[j][i]-solved.state.soil_temperature[j][i])/c.inlet_temperature<2.0e-9,
+                    "soil-shell marching/Newton soil profiles disagree");
+    }
+    RelaxationOptions options; options.theta=1.0; options.pseudo_courant=0.25;
+    options.tolerance=3.0e-7; options.max_pseudo_time=5.0e7; options.max_steps=100;
+    const RelaxationInfo relaxed=implicit_theta_relaxation(c,options);
+    require(relaxed.scaled_residual<=options.tolerance,
+            "soil-shell theta relaxation missed residual tolerance");
+    for(std::size_t i=0;i<=c.cells;++i) {
+        require(std::abs(relaxed.state.gas_temperature[i]-marched.gas_temperature[i])/c.inlet_temperature<2.0e-5,
+                "soil-shell theta/marching gas temperatures disagree");
+        for(std::size_t j=0;j<c.soil_shell_radii.size();++j)
+            require(std::abs(relaxed.state.soil_temperature[j][i]-marched.soil_temperature[j][i])/c.inlet_temperature<2.0e-5,
+                    "soil-shell theta/marching soil temperatures disagree");
+    }
+}
+
 } // namespace
 
 int main()
@@ -273,6 +308,7 @@ int main()
         adiabatic_marching_and_newton_agree();
         adiabatic_theta_relaxation_converges();
         thermal_wall_marching_newton_and_theta_agree();
+        soil_shell_marching_newton_and_theta_agree();
         std::cout << "PASS: all steady-initializer checks\n";
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';

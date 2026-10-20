@@ -8,7 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(pipe_initializers
     src/steady_initializers.cpp
     src/adiabatic_initializers.cpp
-    src/thermal_wall_initializers.cpp)
+    src/thermal_wall_initializers.cpp
+    src/soil_shell_initializers.cpp)
 target_include_directories(pipe_initializers PUBLIC include)
 target_compile_options(pipe_initializers PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
@@ -35,6 +36,14 @@ target_compile_options(thermal_wall_init_demo PRIVATE -Wall -Wextra -Wpedantic -
 add_executable(thermal_wall_profile_export examples/export_thermal_wall_profiles.cpp)
 target_link_libraries(thermal_wall_profile_export PRIVATE pipe_initializers)
 target_compile_options(thermal_wall_profile_export PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(soil_shell_init_demo src/soil_shell_demo.cpp)
+target_link_libraries(soil_shell_init_demo PRIVATE pipe_initializers)
+target_compile_options(soil_shell_init_demo PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(soil_shell_profile_export examples/export_soil_shell_profiles.cpp)
+target_link_libraries(soil_shell_profile_export PRIVATE pipe_initializers)
+target_compile_options(soil_shell_profile_export PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 add_executable(pipe_init_benchmark examples/benchmark_initializers.cpp)
 target_link_libraries(pipe_init_benchmark PRIVATE pipe_initializers)

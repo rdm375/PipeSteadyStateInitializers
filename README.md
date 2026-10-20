@@ -1,29 +1,44 @@
 # Pipe Steady State Initializers
 
-Small C++20 reference implementation of four steady initializers for various single-pipe models:
+A C++20 reference library for constructing steady starting states for transient single-pipe simulations. It compares initialization strategies across four model levels, from isothermal hydraulics to gas, wall, and radial soil-shell heat transfer.
 
-1. Analytical pressure-squared profile with Swamee–Jain Darcy friction.
-2. Physical pseudo-time relaxation of a staggered low-Mach pipe model under fixed boundary conditions.
-3. Damped Newton solve of the same semi-discrete equations with all time derivatives set to zero.
-4. Cell-by-cell discrete steady marching using the same semi-discrete momentum equation.
+## Models at a glance
 
-The current workspace did not contain the original `isothermal-pipe-sim` checkout, so this is a standalone implementation. Its spatial state and boundary storage now follow the simulator notes: pressure/density at $N+1$ nodes, $N$ internal mass flows at staggered faces, and half-cell control volumes at both pipe ends. The boundary conditions are fixed inlet pressure and prescribed outlet mass flow. The default demonstration uses the standard 100 km, 100-cell, 0.6 m pipe at 8 MPa inlet pressure and 100 kg/s outlet flow. The reference case is flat (`hill_height = 0`); nonzero hill elevations remain configurable.
+| Model | State represented | Initializers |
+|---|---|---|
+| Isothermal | Pressure and staggered mass flow at fixed temperature | Analytical approximation, implicit theta relaxation, steady Newton, discrete marching |
+| Adiabatic ideal gas | Pressure, mass flow, and gas temperature | Spatial marching, coupled steady Newton, implicit theta relaxation |
+| Thermal gas and lumped wall | Pressure, flow, gas temperature, and wall temperature | Analytical approximation, spatial marching, coupled Newton, implicit theta relaxation |
+| Fully thermal soil-shell | Gas, wall, and radial soil-shell temperatures with pressure and flow | Analytical approximation, spatial marching, coupled Newton, implicit theta relaxation |
 
-## License and third-party dependencies
+## Profile examples
 
-The project source is licensed under **AGPL-3.0-only**; see [LICENSE](LICENSE)
-for the complete terms and [COPYRIGHT](COPYRIGHT) for the project notice.
-The C++ implementation uses the C++ standard library. Python plotting scripts
-use Python's standard library and Matplotlib; Matplotlib is an optional runtime
-dependency and is not bundled here.
+| Isothermal | Adiabatic ideal gas |
+|:--:|:--:|
+| ![Isothermal pressure and mass-flow profiles for four initializers](initializer_profiles.png) | ![Adiabatic pressure, mass-flow, temperature, and elevation profiles](adiabatic_initializer_profiles.png) |
+| Thermal gas and lumped wall | Fully thermal soil-shell |
+| ![Thermal wall model profiles](thermal_wall_initializer_profiles.png) | ![Soil-shell model profiles](results/soil_shell_initializer_profiles.png) |
 
-AGPL-3.0-only does not establish commercial license fees, royalties, or revenue
-shares. A separate commercial license for proprietary use may be available by
-written agreement with the relevant rights holders. This notice grants no
-separate license and does not guarantee its availability; any commercial terms
-must be negotiated separately after confirming rights held by all contributors.
+## Quick start
 
-## Model implemented
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./build/pipe_init_demo
+./build/adiabatic_pipe_init_demo
+./build/thermal_wall_init_demo
+./build/soil_shell_init_demo
+```
+
+The C++ programs use the C++ standard library. Python plotting and timing-report
+scripts use Matplotlib for plots and otherwise use Python's standard library.
+The GitHub Actions workflow builds the project and runs the test suite on pushes
+and pull requests.
+
+---
+
+## Isothermal model
 
 For constant pipe area $A=\pi D^2/4$, fixed uniform temperature $T_0$, and constant compressibility factor $Z$,
 
@@ -78,7 +93,7 @@ The reporting script writes a Markdown summary with medians, ranges,
 variability, work counts, residuals, and timing ratios relative to the fastest
 median.
 
-## Method behavior
+## Isothermal initializer methods
 
 - **Analytical:** fast continuum approximation; includes gravity and Swamee–Jain friction. It generally has a small mesh-dependent residual when checked against the discrete equations.
 - **Discrete marching:** starts at the prescribed inlet pressure and solves the discrete momentum residual for each next pressure node, with the prescribed steady flow on every staggered face. It takes O(N) work, needs no global nonlinear solve, and reaches the same discrete steady profile as Newton for this model. It reports an error if a cell has no admissible positive-pressure root.
@@ -135,7 +150,7 @@ the semidiscrete gas/wall transient to equilibrium.
     python3 scripts/plot_thermal_wall_profiles.py thermal_wall_profiles.csv \
         -o thermal_wall_initializer_profiles.png
 
-## Current scope
+## Isothermal scope and limitations
 
 The implementation uses a constant-$Z$, constant-viscosity isothermal closure and Swamee–Jain friction. It implements forward flow for the demonstration configuration. The friction term itself is signed for reversed flow, but reversed-flow boundary handling is not yet generalized. The grid positions, endpoint half-cell storage, and boundary convention are aligned to the simulator notes. The momentum closure remains the reduced low-Mach form documented above; the original simulator's momentum flux, EOS, friction routine, and software interfaces still need direct comparison in its source checkout before claiming full physics or code-level equivalence.
 
@@ -260,4 +275,17 @@ The Markdown report summarizes median and mean runtime, standard deviation,
 minimum and maximum, solver work counts, maximum residual, outlet values, and
 timing ratios against the fastest median.
 
-This is a reference implementation for the three initializer algorithms, not yet a patch to the original simulator. The pressure/flow locations and boundary storage follow the simulator notes available here. Before merging into that repository, compare the exact momentum residual, EOS, friction routine and derivatives, and solver interfaces against its source checkout.
+## Integration scope
+
+This repository is a set of standalone reference models, not a production simulator or a patch to another solver. Before integrating an initializer, compare its state layout, boundary treatment, momentum and energy residuals, equation of state, friction model, and solver interfaces against the target simulator.
+## License and commercial licensing
+
+The project source is licensed under **AGPL-3.0-only**; see [LICENSE](LICENSE)
+for the full terms and [COPYRIGHT](COPYRIGHT) for the notice. The C++ code uses
+the standard library. Plotting scripts require Matplotlib, which is not bundled.
+
+AGPL-3.0-only does not require payment, royalties, or revenue share. A commercial
+license for proprietary use requires a separate contract and permission from all
+relevant rights holders. This notice does not set commercial terms or guarantee
+compensation.
+

@@ -1,6 +1,6 @@
-# Pipe Steady Initializers
+# Pipe Steady State Initializers
 
-Small C++20 reference implementation of four steady initializers for the isothermal single-pipe model:
+Small C++20 reference implementation of four steady initializers for various single-pipe models:
 
 1. Analytical pressure-squared profile with Swamee–Jain Darcy friction.
 2. Physical pseudo-time relaxation of a staggered low-Mach pipe model under fixed boundary conditions.
@@ -8,6 +8,20 @@ Small C++20 reference implementation of four steady initializers for the isother
 4. Cell-by-cell discrete steady marching using the same semi-discrete momentum equation.
 
 The current workspace did not contain the original `isothermal-pipe-sim` checkout, so this is a standalone implementation. Its spatial state and boundary storage now follow the simulator notes: pressure/density at $N+1$ nodes, $N$ internal mass flows at staggered faces, and half-cell control volumes at both pipe ends. The boundary conditions are fixed inlet pressure and prescribed outlet mass flow. The default demonstration uses the standard 100 km, 100-cell, 0.6 m pipe at 8 MPa inlet pressure and 100 kg/s outlet flow. The reference case is flat (`hill_height = 0`); nonzero hill elevations remain configurable.
+
+## License and third-party dependencies
+
+The project source is licensed under **AGPL-3.0-only**; see [LICENSE](LICENSE)
+for the complete terms and [COPYRIGHT](COPYRIGHT) for the project notice.
+The C++ implementation uses the C++ standard library. Python plotting scripts
+use Python's standard library and Matplotlib; Matplotlib is an optional runtime
+dependency and is not bundled here.
+
+AGPL-3.0-only does not establish commercial license fees, royalties, or revenue
+shares. A separate commercial license for proprietary use may be available by
+written agreement with the relevant rights holders. This notice grants no
+separate license and does not guarantee its availability; any commercial terms
+must be negotiated separately after confirming rights held by all contributors.
 
 ## Model implemented
 

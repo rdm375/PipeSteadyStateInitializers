@@ -1,3 +1,16 @@
+/*
+ * Copyright (C) 2026 Richard Myers
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Licensed under the GNU Affero General Public License, version 3 only.
+ * See the LICENSE file for the complete terms.
+ *
+ * A separate commercial license for proprietary use may be available by
+ * written agreement with the relevant rights holders. This notice does not
+ * grant that license, guarantee its availability, or set fees, royalties,
+ * or revenue shares.
+ */
+
 #include "pipe/steady_initializers.hpp"
 
 #include <chrono>

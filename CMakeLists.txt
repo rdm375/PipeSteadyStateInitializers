@@ -45,6 +45,10 @@ add_executable(soil_shell_profile_export examples/export_soil_shell_profiles.cpp
 target_link_libraries(soil_shell_profile_export PRIVATE pipe_initializers)
 target_compile_options(soil_shell_profile_export PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
+add_executable(soil_shell_benchmark examples/benchmark_soil_shell.cpp)
+target_link_libraries(soil_shell_benchmark PRIVATE pipe_initializers)
+target_compile_options(soil_shell_benchmark PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
 add_executable(pipe_init_benchmark examples/benchmark_initializers.cpp)
 target_link_libraries(pipe_init_benchmark PRIVATE pipe_initializers)
 target_compile_options(pipe_init_benchmark PRIVATE -Wall -Wextra -Wpedantic -Werror)

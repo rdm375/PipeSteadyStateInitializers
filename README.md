@@ -1,4 +1,4 @@
-# Isothermal Steady Initializers
+# Pipe Steady Initializers
 
 Small C++20 reference implementation of four steady initializers for the isothermal single-pipe model:
 
@@ -154,11 +154,96 @@ benchmarks. Export and make the four-method plot, with one pressure/flow/
 temperature panel per initializer and elevation below:
 
 ```sh
+mkdir -p results
 cmake --build build --target soil_shell_init_demo soil_shell_profile_export -j
 ./build/soil_shell_init_demo
-./build/soil_shell_profile_export > soil_shell_profiles.csv
-python3 scripts/plot_soil_shell_profiles.py soil_shell_profiles.csv \
-    -o soil_shell_initializer_profiles.png
+./build/soil_shell_profile_export > results/soil_shell_profiles.csv
+python3 scripts/plot_soil_shell_profiles.py results/soil_shell_profiles.csv \
+    -o results/soil_shell_initializer_profiles.png
 ```
+
+### Problem addressed and model scope
+
+These initializers produce a pipe state consistent with fixed operating
+boundary conditions before a transient simulation begins. A poor initial
+state can create a long startup transient that reflects the initial mismatch
+instead of the event being studied. The fully thermal case includes the gas,
+pipe wall, and soil temperature states.
+
+The reference model has pressure and gas temperature at the $N+1$ axial nodes,
+mass flow at the $N$ staggered interior faces, one locally lumped wall
+temperature at each node, and four concentric soil-shell temperatures at each
+node. It uses constant gas properties and Darcy friction, elevation, fixed
+inlet pressure and temperature, and prescribed outlet mass flow. Heat conducts
+radially from gas to wall, between soil shells, and from the outer shell to a
+fixed far-field temperature. The soil has thermal capacity during
+pseudo-time relaxation, but axial soil conduction is omitted. Default
+elevation is flat. The default nonlinear state has 133 unknowns.
+
+### Initializer methods
+
+| Method | Construction | Main tradeoff |
+|---|---|---|
+| Analytical / semi-analytical approximation | Collapses the wall and radial soil resistances into an effective conductance, uses an exponential gas-temperature profile, then integrates the continuous pressure equation. | Fast initial guess. It approximates the discrete balances, so its discrete residual is larger. |
+| Steady spatial marching | Advances gas temperature cell by cell using the discrete energy balance, solves each cell's discrete momentum equation for pressure, and reconstructs wall and shell temperatures from radial resistance. | Linear work in the number of axial cells; satisfies the current model's discrete steady equations directly. |
+| Coupled steady Newton | Solves the complete steady residual for nodal pressure, gas temperature, staggered flow, wall temperature, and every soil-shell temperature at once. The demo seeds it with the analytical approximation. | General nonlinear reference with a tight residual; more expensive than marching for this one-way, forward-flow pipe. |
+| Implicit $\theta$ pseudo-time relaxation | Advances the coupled transient gas, wall, and shell balances with the implicit theta method until the common steady residual meets tolerance. The default uses $\theta=1$ (backward Euler), starting near the analytical profile with a small shell-temperature perturbation. | Uses the transient equations and supports more complicated state coupling, but requires repeated nonlinear solves. Pseudo-time is a numerical path to equilibrium, not elapsed operating time. |
+
+### Dell 7710 timing and residuals
+
+These single-run measurements came from the default 16-cell case with Release
+optimization. The benchmark/report scripts below repeat the solves and report
+medians and variability; use those repeated results for machine-specific
+comparisons.
+
+| Method | Runtime | Scaled steady residual | Work |
+|---|---:|---:|---|
+| Analytical / semi-analytical | 22 μs | $3.63\times10^{-4}$ | direct profile evaluation |
+| Steady spatial marching | 10 μs | $1.75\times10^{-15}$ | one forward pass over 16 cells |
+| Coupled steady Newton | 2.80 ms | $2.03\times10^{-15}$ | 2 Newton iterations |
+| Implicit $\theta$ pseudo-time relaxation | 100.18 ms | $1.13\times10^{-9}$ | 16 steps; 54 inner Newton iterations; $\theta=1$ |
+
+Marching, Newton, and relaxation converge to the same discrete state: outlet
+pressure is 5.366695 MPa and outlet gas temperature is 280.094429 K. The
+analytical approximation gives 5.368596 MPa and 279.834063 K. Its larger
+residual is expected because it solves a continuum approximation rather than
+the discrete grid equations. The printed runtimes are single observations and
+will vary with compiler, optimization flags, and machine load.
+
+### Reading the profile plot
+
+The figure has one panel per initializer and a shared distance axis. In each
+of the four upper panels, blue is pressure on the left axis, red dashed is
+staggered mass flow on the inner right axis, and the outer right axis shows gas
+temperature, wall temperature, and all four soil-shell temperatures. Soil
+shell 1 is adjacent to the pipe wall; the shell curves approach the fixed
+far-field temperature toward the outer radius. The bottom panel shows pipe
+elevation. With the default flat pipe it is a zero line; set `hill_height` in
+the configuration to compare elevation effects.
+
+![Four initialization profiles: pressure, flow, gas/wall/soil temperatures, and elevation](results/soil_shell_initializer_profiles.png)
+
+### Repeated performance report
+
+The benchmark times each initializer after a warmup. The analytical profile
+used as the Newton initial guess is constructed before Newton timing, while
+theta relaxation includes its own initialization. Defaults are 30 runs for
+analytical, marching, and Newton; 3 runs for relaxation; and one warmup per
+method. Arguments select the three counts in that order:
+
+```sh
+mkdir -p results
+cmake --build build --target soil_shell_benchmark soil_shell_profile_export -j
+./build/soil_shell_benchmark 30 5 1 > results/soil_shell_timing_data.csv
+python3 scripts/report_soil_shell_timings.py results/soil_shell_timing_data.csv \
+    -o results/soil_shell_timing_report.md
+./build/soil_shell_profile_export > results/soil_shell_profiles.csv
+python3 scripts/plot_soil_shell_profiles.py results/soil_shell_profiles.csv \
+    -o results/soil_shell_initializer_profiles.png
+```
+
+The Markdown report summarizes median and mean runtime, standard deviation,
+minimum and maximum, solver work counts, maximum residual, outlet values, and
+timing ratios against the fastest median.
 
 This is a reference implementation for the three initializer algorithms, not yet a patch to the original simulator. The pressure/flow locations and boundary storage follow the simulator notes available here. Before merging into that repository, compare the exact momentum residual, EOS, friction routine and derivatives, and solver interfaces against its source checkout.

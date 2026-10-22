@@ -13,6 +13,26 @@ A C++20 reference library for constructing steady starting states for transient 
 
 All four profile examples use the same 100 m cosine-shaped hill over the 100 km pipe, with equal elevations at the two ends. Each model's `hill_height` setting controls the crest height.
 
+### Geometry and grids used in the profile examples
+
+| Parameter | Isothermal | Adiabatic ideal gas | Thermal gas and lumped wall | Fully thermal soil-shell |
+|---|---:|---:|---:|---:|
+| Pipe length, $L$ | 100 km | 100 km | 100 km | 100 km |
+| Internal diameter, $D$ | 0.60 m | 0.60 m | 0.60 m | 0.60 m |
+| Flow area, $A=\pi D^2/4$ | 0.2827 m² | 0.2827 m² | 0.2827 m² | 0.2827 m² |
+| Darcy roughness | 0.045 mm | 0.045 mm | 0.045 mm | 0.045 mm |
+| Axial cells, $N$ | 100 | 20 | 20 | 16 |
+| Axial cell length, $\Delta x$ | 1 km | 5 km | 5 km | 6.25 km |
+| Hill crest height | 100 m | 100 m | 100 m | 100 m |
+| Wall thickness | — | — | 12.7 mm | 12.7 mm |
+| Soil-shell node radii | — | — | — | 0.40, 0.58, 0.84, 1.20 m |
+| Far-field radius | — | — | — | 2.0 m |
+
+The elevation is $z(x)=\frac{h}{2}[1-\cos(2\pi x/L)]$, where $h=100$ m
+for these plots. It is zero at both ends and reaches its crest at the pipe
+midpoint. The listed soil radii are measured from the pipe centerline; the
+2.0 m far-field radius is the outer thermal boundary.
+
 ## Profile examples
 
 | Isothermal | Adiabatic ideal gas |
@@ -66,7 +86,7 @@ checkout with:
 bash scripts/run_elevation_gravity_validation.sh
 ```
 
-The script configures and builds the required exporters, then runs the three
+The script configures and builds the required exporters, then runs four
 Python diagnostics. Plot generation requires Matplotlib; the C++ build and
 tests use the standard C++ toolchain and CMake.
 

@@ -6,3 +6,6 @@ __pycache__/
 *.py[cod]
 results/*_patch.zip
 *.backup.*
+adiabatic_elevation_recovery.csv
+adiabatic_elevation_recovery.png
+adiabatic_elevation_increment_error.png

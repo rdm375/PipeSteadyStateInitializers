@@ -22,6 +22,7 @@ int main()
     try {
         using namespace pipe_init::adiabatic;
         Configuration c;
+        c.hill_height = 100.0; // Match the adiabatic demo
         const State marching = steady_spatial_marching(c);
 
         State initial_guess;

@@ -55,6 +55,7 @@ int main()
     using namespace pipe_init::soil_shell;
     try {
         Configuration c;
+        c.hill_height=100.0; // 100 m cosine-shaped hill
         auto a0=Clock::now(); const State analytical=analytical_approximation(c); auto a1=Clock::now();
         auto m0=Clock::now(); const State marching=steady_spatial_marching(c); auto m1=Clock::now();
         auto n0=Clock::now(); const SolveInfo newton=coupled_steady_newton(c,analytical); auto n1=Clock::now();

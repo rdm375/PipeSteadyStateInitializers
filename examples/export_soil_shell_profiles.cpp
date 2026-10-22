@@ -22,6 +22,7 @@ int main()
     using namespace pipe_init::soil_shell;
     try {
         Configuration c;
+        c.hill_height=100.0; // Match the soil-shell demo
         const State analytical=analytical_approximation(c),marching=steady_spatial_marching(c);
         const State newton=coupled_steady_newton(c,analytical).state;
         RelaxationOptions options; const State relaxed=implicit_theta_relaxation(c,options).state;

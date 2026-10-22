@@ -57,6 +57,7 @@ int main()
     using namespace pipe_init::thermal_wall;
     try {
         Configuration c;
+        c.hill_height = 100.0; // 100 m cosine-shaped hill
         auto t0=Clock::now(); const State analytical=analytical_approximation(c);
         auto t1=Clock::now(); const double ta=elapsed(t0,t1);
         t0=Clock::now(); const State marching=steady_spatial_marching(c);

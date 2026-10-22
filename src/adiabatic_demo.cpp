@@ -76,6 +76,7 @@ int main()
     try {
         using namespace pipe_init::adiabatic;
         Configuration c;
+        c.hill_height = 100.0; // 100 m cosine-shaped hill
 
         auto start = Clock::now();
         const State marched = steady_spatial_marching(c);

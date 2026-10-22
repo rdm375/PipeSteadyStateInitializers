@@ -43,6 +43,7 @@ int main()
 {
     try {
         pipe_init::Configuration configuration;
+        configuration.hill_height = 100.0; // 100 m cosine-shaped hill
 
         const auto analytical =
             pipe_init::analytical_pressure_squared(configuration);

@@ -11,13 +11,15 @@ A C++20 reference library for constructing steady starting states for transient 
 | Thermal gas and lumped wall | Pressure, flow, gas temperature, and wall temperature | Analytical approximation, spatial marching, coupled Newton, implicit theta relaxation |
 | Fully thermal soil-shell | Gas, wall, and radial soil-shell temperatures with pressure and flow | Analytical approximation, spatial marching, coupled Newton, implicit theta relaxation |
 
+All four profile examples use the same 100 m cosine-shaped hill over the 100 km pipe, with equal elevations at the two ends. Each model's `hill_height` setting controls the crest height.
+
 ## Profile examples
 
 | Isothermal | Adiabatic ideal gas |
 |:--:|:--:|
-| ![Isothermal pressure and mass-flow profiles for four initializers](initializer_profiles.png) | ![Adiabatic pressure, mass-flow, temperature, and elevation profiles](adiabatic_initializer_profiles.png) |
+| ![Isothermal pressure, mass-flow, and elevation profiles for four initializers](initializer_profiles.png) | ![Adiabatic pressure, mass-flow, temperature, and elevation profiles](adiabatic_initializer_profiles.png) |
 | Thermal gas and lumped wall | Fully thermal soil-shell |
-| ![Thermal wall model profiles](thermal_wall_initializer_profiles.png) | ![Soil-shell model profiles](results/soil_shell_initializer_profiles.png) |
+| ![Thermal wall pressure, flow, temperature, and elevation profiles](thermal_wall_initializer_profiles.png) | ![Soil-shell model profiles](results/soil_shell_initializer_profiles.png) |
 
 ## Quick start
 
@@ -206,8 +208,9 @@ node. It uses constant gas properties and Darcy friction, elevation, fixed
 inlet pressure and temperature, and prescribed outlet mass flow. Heat conducts
 radially from gas to wall, between soil shells, and from the outer shell to a
 fixed far-field temperature. The soil has thermal capacity during
-pseudo-time relaxation, but axial soil conduction is omitted. Default
-elevation is flat. The default nonlinear state has 133 unknowns.
+pseudo-time relaxation, but axial soil conduction is omitted. The README demo
+uses the shared 100 m cosine-shaped hill. The default nonlinear state has 133
+unknowns.
 
 ### Initializer methods
 
@@ -246,9 +249,7 @@ of the four upper panels, blue is pressure on the left axis, red dashed is
 staggered mass flow on the inner right axis, and the outer right axis shows gas
 temperature, wall temperature, and all four soil-shell temperatures. Soil
 shell 1 is adjacent to the pipe wall; the shell curves approach the fixed
-far-field temperature toward the outer radius. The bottom panel shows pipe
-elevation. With the default flat pipe it is a zero line; set `hill_height` in
-the configuration to compare elevation effects.
+far-field temperature toward the outer radius. The bottom panel shows the shared 100 m pipe-elevation hill.
 
 ![Four initialization profiles: pressure, flow, gas/wall/soil temperatures, and elevation](results/soil_shell_initializer_profiles.png)
 
@@ -293,4 +294,33 @@ AGPL-3.0-only does not require payment, royalties, or revenue share. A commercia
 license for proprietary use requires a separate contract and permission from all
 relevant rights holders. This notice does not set commercial terms or guarantee
 compensation.
+## Adiabatic elevation-recovery cross-check
 
+The adiabatic profile exporter includes the known node elevations alongside
+pressure, temperature, and staggered mass flow. The recovery script independently
+reconstructs elevation from those simulated profiles and compares it with the
+known profile. The energy balance uses temperature and flow; the momentum balance
+uses the simulated pressure gradient, temperature-derived density, flow, and the
+Darcy friction model. Both reconstructions use the inlet elevation as the datum
+by default.
+
+The cumulative plot shows signed elevation error (recovered minus known). A
+second plot shows the signed cellwise increment error, which helps distinguish a
+small bias accumulated along the pipe from error concentrated in particular
+cells. The script also reports maximum and RMS errors. This is a consistency
+check for the adiabatic ideal-gas model, not a transient simulation. Its default
+pipe and gas parameters should match the exported case; command-line options can
+override them.
+
+Run the exporter and cross-check from the repository root:
+
+```sh
+cmake --build build --target adiabatic_pipe_init_profile_export --parallel
+./build/adiabatic_pipe_init_profile_export > adiabatic_profiles.csv
+python3 scripts/recover_adiabatic_elevation.py adiabatic_profiles.csv
+```
+
+The script writes `adiabatic_elevation_recovery.csv`,
+`adiabatic_elevation_recovery.png`, and
+`adiabatic_elevation_increment_error.png` in the current directory. Use
+`--no-plot` to skip figures or `--help` to see parameter and output overrides.

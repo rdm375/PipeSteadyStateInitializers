@@ -22,6 +22,7 @@ int main()
     using namespace pipe_init::thermal_wall;
     try {
         Configuration c;
+        c.hill_height=100.0; // Match the thermal-wall demo
         const State analytical=analytical_approximation(c);
         const State marching=steady_spatial_marching(c);
         const State newton=coupled_steady_newton(c,analytical).state;

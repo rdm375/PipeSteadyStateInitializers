@@ -21,6 +21,7 @@ int main()
 {
     try {
         pipe_init::Configuration configuration;
+        configuration.hill_height = 100.0; // Match the isothermal demo
 
         const auto analytical =
             pipe_init::analytical_pressure_squared(configuration);

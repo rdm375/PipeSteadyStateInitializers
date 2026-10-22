@@ -52,6 +52,19 @@ double effective_u(const Configuration& c)
     const double hi=c.inner_conductance_per_length();
     return 1.0/(1.0/hi+total_radial_resistance(c));
 }
+double gravity_aware_temperature(const Configuration& c, double x, double conductance)
+{
+    const double mcp = c.outlet_mass_flow*cp(c);
+    const double a = conductance/mcp;
+    const double k = 2.0*pi/c.length;
+    const double decay = std::exp(-a*x);
+    const double elevation_integral =
+        (a*std::sin(k*x)-k*std::cos(k*x)+k*decay)/(a*a+k*k);
+    const double gravity_temperature = (c.gravity/cp(c))*
+        (0.5*c.hill_height*k)*elevation_integral;
+    return c.far_field_temperature + (c.inlet_temperature-c.far_field_temperature)*decay
+        - gravity_temperature;
+}
 double friction(const Configuration& c,double m)
 {
     const double re=std::abs(m)*c.diameter/(c.area()*c.viscosity);
@@ -136,7 +149,8 @@ std::vector<double> steady_r(const Configuration& c,const std::vector<double>& y
     for(std::size_t i=0;i<n;++i) r[n+i]=mom(c,s,i,z)/ps;
     for(std::size_t i=1;i<=n;++i) {
         const double ml=s.flow[i-1],mr=i<n?s.flow[i]:c.outlet_mass_flow;
-        const double flux=cp(c)*(mr*s.gas_temperature[i]-ml*s.gas_temperature[i-1]);
+        const double flux=cp(c)*(mr*s.gas_temperature[i]-ml*s.gas_temperature[i-1])
+            + c.gravity*(mr*z[i]-ml*z[i-1]);
         const double q=c.inner_conductance_per_length()*(s.wall_temperature[i]-s.gas_temperature[i]);
         r[2*n+i-1]=(flux-q*ell(c,i))/es;
     }
@@ -244,10 +258,16 @@ std::vector<double> theta_r(const Configuration& c,const State& old,const std::v
         (theta*mom(c,s,i,z)+(1.0-theta)*mom(c,old,i,z))/ms;
     for(std::size_t i=1;i<=n;++i) { const double l=ell(c,i);
         const double rn=rho(c,s.pressure[i],s.gas_temperature[i]),ro=rho(c,old.pressure[i],old.gas_temperature[i]);
-        const double storage=c.area()*l*cv(c)*(rn*s.gas_temperature[i]-ro*old.gas_temperature[i])/dt;
-        const std::size_t f=i-1; const double fl=theta*s.flow[f]*cp(c)*s.gas_temperature[f]+(1.0-theta)*old.flow[f]*cp(c)*old.gas_temperature[f];
-        const double fr=i<n?theta*s.flow[i]*cp(c)*s.gas_temperature[i]+(1.0-theta)*old.flow[i]*cp(c)*old.gas_temperature[i]:
-            c.outlet_mass_flow*cp(c)*(theta*s.gas_temperature[i]+(1.0-theta)*old.gas_temperature[i]);
+        const double storage=c.area()*l*(cv(c)*(rn*s.gas_temperature[i]-ro*old.gas_temperature[i])+
+            c.gravity*z[i]*(rn-ro))/dt;
+        const std::size_t f=i-1;
+        const double hfl_new=cp(c)*s.gas_temperature[f]+c.gravity*z[f];
+        const double hfl_old=cp(c)*old.gas_temperature[f]+c.gravity*z[f];
+        const double fl=theta*s.flow[f]*hfl_new+(1.0-theta)*old.flow[f]*hfl_old;
+        const double hfr_new=cp(c)*s.gas_temperature[i]+c.gravity*z[i];
+        const double hfr_old=cp(c)*old.gas_temperature[i]+c.gravity*z[i];
+        const double fr=i<n?theta*s.flow[i]*hfr_new+(1.0-theta)*old.flow[i]*hfr_old:
+            c.outlet_mass_flow*(theta*hfr_new+(1.0-theta)*hfr_old);
         const double qn=c.inner_conductance_per_length()*(s.wall_temperature[i]-s.gas_temperature[i]);
         const double qo=c.inner_conductance_per_length()*(old.wall_temperature[i]-old.gas_temperature[i]);
         r[2*n+i-1]=(storage+fr-fl-(theta*qn+(1.0-theta)*qo)*l)/es; }
@@ -291,8 +311,8 @@ State analytical_approximation(const Configuration& c)
     c.validate(); const std::size_t n=c.cells; State s; s.pressure.resize(n+1); s.gas_temperature.resize(n+1);
     s.wall_temperature.resize(n+1); s.flow.assign(n,c.outlet_mass_flow); s.soil_temperature.assign(c.soil_shell_radii.size(),std::vector<double>(n+1));
     s.pressure[0]=c.inlet_pressure; s.gas_temperature[0]=c.inlet_temperature; const double u=effective_u(c);
-    for(std::size_t i=1;i<=n;++i) { const double x=i*c.dx(); s.gas_temperature[i]=c.far_field_temperature+
-        (c.inlet_temperature-c.far_field_temperature)*std::exp(-u*x/(c.outlet_mass_flow*cp(c))); }
+    for(std::size_t i=1;i<=n;++i) { const double x=i*c.dx();
+        s.gas_temperature[i]=gravity_aware_temperature(c,x,u); }
     for(std::size_t i=0;i<=n;++i) set_radial_profile(c,s,i);
     const auto z=c.elevation_nodes(); for(std::size_t i=0;i<n;++i) s.pressure[i+1]=pressure_step(c,s,i,z); return s;
 }
@@ -302,8 +322,17 @@ State steady_spatial_marching(const Configuration& c)
     s.wall_temperature.resize(n+1); s.flow.assign(n,c.outlet_mass_flow); s.soil_temperature.assign(c.soil_shell_radii.size(),std::vector<double>(n+1));
     s.pressure[0]=c.inlet_pressure; s.gas_temperature[0]=c.inlet_temperature; const double u=effective_u(c),mc=c.outlet_mass_flow*cp(c);
     set_radial_profile(c,s,0);
-    for(std::size_t i=1;i<=n;++i) { const double l=ell(c,i); s.gas_temperature[i]=(mc*s.gas_temperature[i-1]+u*l*c.far_field_temperature)/(mc+u*l); set_radial_profile(c,s,i); }
-    const auto z=c.elevation_nodes(); for(std::size_t i=0;i<n;++i) s.pressure[i+1]=discrete_pressure_step(c,s,i,z); return s;
+    const auto z=c.elevation_nodes();
+    for(std::size_t i=1;i<=n;++i) {
+        const double l=ell(c,i);
+        const double gravity_energy=c.outlet_mass_flow*c.gravity*(z[i]-z[i-1]);
+        s.gas_temperature[i]=(mc*s.gas_temperature[i-1]-gravity_energy+u*l*c.far_field_temperature)/(mc+u*l);
+        set_radial_profile(c,s,i);
+    }
+    for(std::size_t i=0;i<n;++i) {
+        s.pressure[i+1]=discrete_pressure_step(c,s,i,z);
+    }
+    return s;
 }
 SolveInfo coupled_steady_newton(const Configuration& c,const State& initial,double tol,std::size_t maxit)
 { c.validate(); auto y=encode(c,initial); const auto a=newton(y,[&](const auto& x){return steady_r(c,x);},[&](const auto& x){return valid(c,x);},tol,maxit); return {decode(c,y),a.first,a.second}; }

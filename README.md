@@ -1,4 +1,4 @@
-# Pipe Steady State Initializers
+	# Pipe Steady State Initializers
 
 A C++20 reference library for constructing steady starting states for transient single-pipe simulations. It compares initialization strategies across four model levels, from isothermal hydraulics to gas, wall, and radial soil-shell heat transfer.
 
@@ -20,6 +20,48 @@ All four profile examples use the same 100 m cosine-shaped hill over the 100 km 
 | ![Isothermal pressure, mass-flow, and elevation profiles for four initializers](initializer_profiles.png) | ![Adiabatic pressure, mass-flow, temperature, and elevation profiles](adiabatic_initializer_profiles.png) |
 | Thermal gas and lumped wall | Fully thermal soil-shell |
 | ![Thermal wall pressure, flow, temperature, and elevation profiles](thermal_wall_initializer_profiles.png) | ![Soil-shell model profiles](results/soil_shell_initializer_profiles.png) |
+
+## Gravity terms in the energy-balance validation
+
+The adiabatic, thermal-wall, and fully thermal models export state profiles
+that let us check their discrete energy balances. The adiabatic check uses
+total specific enthalpy $c_pT+u^2/2+gz$. The two heated models use the exported
+gas and wall temperatures, their gas-to-wall heat flux, and the implemented
+gravitational-potential energy flux. Each plot compares the elevation
+reconstructed from the energy equation with the known profile and shows the
+scaled cell energy residual both with gravity and with the gravity term
+omitted from the same state. The isothermal model has no energy equation.
+
+| Adiabatic ideal gas | Thermal gas and lumped wall | Fully thermal soil-shell |
+|:--:|:--:|:--:|
+| ![Adiabatic energy-balance gravity validation](results/adiabatic_energy_gravity_validation.png) | ![Thermal-wall energy-balance gravity validation](results/thermal_wall_energy_gravity_validation.png) | ![Soil-shell energy-balance gravity validation](results/soil_shell_energy_gravity_validation.png) |
+
+These are discrete model-consistency checks. A small gravity-on residual and
+recovery error show that the exported steady state satisfies the implemented
+energy equation; the gravity-off curve shows the contribution of the omitted
+potential-energy term for that same state. This comparison does not replace
+validation against an independent transient solver or experimental data.
+
+## Hydraulic elevation-reconstruction cross-check
+
+The isothermal check reconstructs node elevations from exported pressure and
+staggered mass-flow profiles by inverting the same discrete low-Mach momentum
+residual used by the isothermal model. The thermal-wall and soil-shell checks
+use their corresponding momentum balances and the exported gas temperatures.
+Each reconstruction is anchored at the inlet elevation and compared with the
+known 100 m hill. Plots show cumulative and cellwise elevation misfit; the
+isothermal Newton plot also compares its scaled momentum residual with gravity
+included and omitted from the same state.
+
+For each model, the Newton/marching reconstruction tests the discrete
+hydraulic balance at solver tolerance. Analytical and relaxation curves show
+the residual of those initializer states. These are internal consistency
+checks against the implemented equations, not independent measurements of
+pipe elevation.
+
+| Isothermal | Thermal gas and lumped wall | Fully thermal soil-shell |
+|:--:|:--:|:--:|
+| ![Isothermal elevation recovered from pressure and mass flow](results/isothermal_elevation_recovery.png) | ![Thermal-wall hydraulic elevation recovery](results/thermal_wall_elevation_recovery.png) | ![Soil-shell hydraulic elevation recovery](results/soil_shell_elevation_recovery.png) |
 
 ## Quick start
 
@@ -140,8 +182,8 @@ simulator-aligned nodal/staggered layout. At steady state the wall balance is
 algebraic, so wall temperature is recovered locally; wall heat capacity
 remains active in pseudo-time relaxation.
 
-The analytical approximation uses an exponential gas-temperature profile
-and a continuous pressure integral. Spatial marching solves the discrete
+The analytical approximation uses exponential thermal relaxation with a
+gravity-potential correction and a continuous pressure integral. Spatial marching solves the discrete
 temperature/wall balance and local momentum equation. Coupled Newton solves
 the complete discrete steady residual; implicit theta relaxation advances
 the semidiscrete gas/wall transient to equilibrium.
@@ -162,15 +204,16 @@ The `pipe_init::soil_shell` model extends the locally lumped pipe wall with
 concentric radial soil shells. Each axial node has one temperature per soil
 shell. Heat conducts radially between the wall and shells and through the
 outermost shell to a prescribed far-field temperature. Soil has heat capacity
-in pseudo-time; this reference model omits axial soil conduction. The gas uses
-the same low-Mach ideal-gas momentum and energy balances, elevation, and
-simulator-aligned staggered grid as the other thermal reference modules.
+in pseudo-time; this reference model omits axial soil conduction. The gas uses low-Mach ideal-gas momentum and energy balances on the
+simulator-aligned staggered grid. Elevation enters the momentum residual and
+gravitational potential energy $gz$ enters the gas energy flux and transient
+storage. The low-Mach model omits kinetic-energy transport.
 
 The default configuration has four soil shells, with node radii 0.40, 0.58,
 0.84, and 1.20 m, and a prescribed far-field boundary at 2.0 m. The analytical
 approximation treats the complete radial resistance as an effective heat
-transfer coefficient and uses an exponential gas-temperature profile plus a
-continuous pressure integral. Spatial marching solves the discrete energy
+transfer coefficient and uses an exponential thermal profile with a gravity-potential correction
+plus a continuous pressure integral. Spatial marching solves the discrete energy
 balance and local momentum equation, reconstructing wall and shell temperatures
 from the radial resistance network. Coupled Newton solves every gas, wall, and
 soil-shell steady balance simultaneously. Implicit theta relaxation advances

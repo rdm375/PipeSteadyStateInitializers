@@ -235,6 +235,29 @@ void adiabatic_theta_relaxation_converges()
             "adiabatic theta-relaxed state fails the steady residual check");
 }
 
+void thermal_models_include_gravitational_potential_in_energy()
+{
+    pipe_init::thermal_wall::Configuration wall;
+    wall.hill_height = 100.0;
+    const auto wall_hill = pipe_init::thermal_wall::steady_spatial_marching(wall);
+    wall.hill_height = 0.0;
+    const auto wall_flat = pipe_init::thermal_wall::steady_spatial_marching(wall);
+    const std::size_t wall_crest = wall.cells/2;
+    require(wall_hill.gas_temperature[wall_crest] <
+                wall_flat.gas_temperature[wall_crest]-0.05,
+            "thermal-wall hill should convert gravitational potential to lower gas enthalpy");
+
+    pipe_init::soil_shell::Configuration soil;
+    soil.hill_height = 100.0;
+    const auto soil_hill = pipe_init::soil_shell::steady_spatial_marching(soil);
+    soil.hill_height = 0.0;
+    const auto soil_flat = pipe_init::soil_shell::steady_spatial_marching(soil);
+    const std::size_t soil_crest = soil.cells/2;
+    require(soil_hill.gas_temperature[soil_crest] <
+                soil_flat.gas_temperature[soil_crest]-0.05,
+            "soil-shell hill should convert gravitational potential to lower gas enthalpy");
+}
+
 void thermal_wall_marching_newton_and_theta_agree()
 {
     using namespace pipe_init::thermal_wall;
@@ -320,6 +343,7 @@ int main()
         trapezoidal_relaxation_matches_newton_steady_state();
         adiabatic_marching_and_newton_agree();
         adiabatic_theta_relaxation_converges();
+        thermal_models_include_gravitational_potential_in_energy();
         thermal_wall_marching_newton_and_theta_agree();
         soil_shell_marching_newton_and_theta_agree();
         std::cout << "PASS: all steady-initializer checks\n";

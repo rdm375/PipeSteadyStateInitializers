@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software in your work, please cite it using this metadata."
+title: Pipe Steady State Initializers
+authors:
+  - family-names: Myers
+    given-names: Richard
+abstract: >-
+  A C++20 reference library for constructing steady starting states for
+  transient single-pipe simulations. It compares analytical approximations,
+  spatial marching, coupled steady Newton solves, and implicit theta
+  relaxation across isothermal, adiabatic, thermal-wall, and soil-shell
+  reference models.
+keywords:
+  - pipeline hydraulics
+  - steady-state initialization
+  - numerical methods
+  - C++20
+license: AGPL-3.0-only
+repository-code: https://github.com/rdm375/PipeSteadyStateInitializers

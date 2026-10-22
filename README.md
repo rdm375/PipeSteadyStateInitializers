@@ -278,6 +278,11 @@ timing ratios against the fastest median.
 ## Integration scope
 
 This repository is a set of standalone reference models, not a production simulator or a patch to another solver. Before integrating an initializer, compare its state layout, boundary treatment, momentum and energy residuals, equation of state, friction model, and solver interfaces against the target simulator.
+## Citation
+
+Citation metadata is provided in [CITATION.cff](CITATION.cff). GitHub can use
+this file to display a formatted citation for the repository.
+
 ## License and commercial licensing
 
 The project source is licensed under **AGPL-3.0-only**; see [LICENSE](LICENSE)

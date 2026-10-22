@@ -1,4 +1,4 @@
-	# Pipe Steady State Initializers
+# Pipe Steady State Initializers
 
 A C++20 reference library for constructing steady starting states for transient single-pipe simulations. It compares initialization strategies across four model levels, from isothermal hydraulics to gas, wall, and radial soil-shell heat transfer.
 
@@ -87,8 +87,16 @@ bash scripts/run_elevation_gravity_validation.sh
 ```
 
 The script configures and builds the required exporters, then runs four
-Python diagnostics. Plot generation requires Matplotlib; the C++ build and
-tests use the standard C++ toolchain and CMake.
+Python diagnostics. Plot generation requires Matplotlib. To install it in an
+isolated Python environment, run:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install matplotlib
+```
+
+The C++ build and tests use the standard C++ toolchain and CMake.
 
 | Isothermal | Thermal gas and lumped wall | Fully thermal soil-shell |
 |:--:|:--:|:--:|
@@ -108,8 +116,8 @@ ctest --test-dir build --output-on-failure
 
 The C++ programs use the C++ standard library. Python plotting and timing-report
 scripts use Matplotlib for plots and otherwise use Python's standard library.
-The GitHub Actions workflow builds the project and runs the test suite on pushes
-and pull requests.
+The GitHub Actions workflow builds and tests the project and runs the
+reproducible elevation and gravity validation on pushes and pull requests.
 
 ---
 

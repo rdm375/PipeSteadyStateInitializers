@@ -59,6 +59,17 @@ the residual of those initializer states. These are internal consistency
 checks against the implemented equations, not independent measurements of
 pipe elevation.
 
+Regenerate the profile data, recovery CSVs, and validation plots from a clean
+checkout with:
+
+```sh
+bash scripts/run_elevation_gravity_validation.sh
+```
+
+The script configures and builds the required exporters, then runs the three
+Python diagnostics. Plot generation requires Matplotlib; the C++ build and
+tests use the standard C++ toolchain and CMake.
+
 | Isothermal | Thermal gas and lumped wall | Fully thermal soil-shell |
 |:--:|:--:|:--:|
 | ![Isothermal elevation recovered from pressure and mass flow](results/isothermal_elevation_recovery.png) | ![Thermal-wall hydraulic elevation recovery](results/thermal_wall_elevation_recovery.png) | ![Soil-shell hydraulic elevation recovery](results/soil_shell_elevation_recovery.png) |

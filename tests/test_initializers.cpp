@@ -18,7 +18,9 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <algorithm>
 #include <iostream>
+#include <utility>
 #include <stdexcept>
 #include <string>
 
@@ -29,6 +31,36 @@ void require(bool condition, const std::string& message)
     if (!condition) {
         throw std::runtime_error(message);
     }
+}
+
+template<class Configuration, class State>
+std::pair<double, double> thermal_energy_residuals(
+    const Configuration& c, const State& state)
+{
+    const auto elevation = c.elevation_nodes();
+    const double cp = c.gamma*c.gas_constant/(c.gamma - 1.0);
+    const double scale = std::max(1.0, std::abs(c.outlet_mass_flow)) *
+                         cp*c.inlet_temperature;
+    double with_gravity = 0.0;
+    double without_gravity = 0.0;
+    for (std::size_t i = 1; i <= c.cells; ++i) {
+        const double left_flow = state.flow[i - 1];
+        const double right_flow = i < c.cells
+            ? state.flow[i] : c.outlet_mass_flow;
+        const double length = i == c.cells ? c.dx()/2.0 : c.dx();
+        const double enthalpy_flux = cp*(
+            right_flow*state.gas_temperature[i] -
+            left_flow*state.gas_temperature[i - 1]);
+        const double gravity_flux = c.gravity*(
+            right_flow*elevation[i] - left_flow*elevation[i - 1]);
+        const double heat_in = c.inner_conductance_per_length()*(
+            state.wall_temperature[i] - state.gas_temperature[i])*length;
+        with_gravity = std::max(with_gravity,
+            std::abs(enthalpy_flux + gravity_flux - heat_in)/scale);
+        without_gravity = std::max(without_gravity,
+            std::abs(enthalpy_flux - heat_in)/scale);
+    }
+    return {with_gravity, without_gravity};
 }
 
 pipe_init::Configuration small_case()
@@ -240,6 +272,11 @@ void thermal_models_include_gravitational_potential_in_energy()
     pipe_init::thermal_wall::Configuration wall;
     wall.hill_height = 100.0;
     const auto wall_hill = pipe_init::thermal_wall::steady_spatial_marching(wall);
+    const auto wall_residuals = thermal_energy_residuals(wall, wall_hill);
+    require(wall_residuals.first < 2.0e-12,
+            "thermal-wall marching must satisfy the gravity-inclusive energy balance");
+    require(wall_residuals.second > 1.0e-5,
+            "omitting gravity must produce a measurable thermal-wall energy residual");
     wall.hill_height = 0.0;
     const auto wall_flat = pipe_init::thermal_wall::steady_spatial_marching(wall);
     const std::size_t wall_crest = wall.cells/2;
@@ -250,6 +287,11 @@ void thermal_models_include_gravitational_potential_in_energy()
     pipe_init::soil_shell::Configuration soil;
     soil.hill_height = 100.0;
     const auto soil_hill = pipe_init::soil_shell::steady_spatial_marching(soil);
+    const auto soil_residuals = thermal_energy_residuals(soil, soil_hill);
+    require(soil_residuals.first < 2.0e-12,
+            "soil-shell marching must satisfy the gravity-inclusive energy balance");
+    require(soil_residuals.second > 1.0e-5,
+            "omitting gravity must produce a measurable soil-shell energy residual");
     soil.hill_height = 0.0;
     const auto soil_flat = pipe_init::soil_shell::steady_spatial_marching(soil);
     const std::size_t soil_crest = soil.cells/2;

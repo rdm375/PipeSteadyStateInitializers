@@ -186,7 +186,7 @@ def main():
             f"z_momentum_{method}_m", f"error_momentum_{method}_m",
         ))
     with args.output.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.writer(stream)
+        writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(headers)
         for i, x_i in enumerate(x):
             row = [x_i, truth[i]]
